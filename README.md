@@ -38,3 +38,4 @@ $ make db/start
 ## 参考実装
 
 - [rust](https://github.com/ohkilab/SU-expA-final-references/tree/main/rust)
+- [go](https://github.com/ohkilab/SU-expA-final-references/tree/main/go)
