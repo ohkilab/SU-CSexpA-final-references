@@ -37,4 +37,4 @@ $ make db/start
 
 ## 参考実装
 
-- [rust]("./rust")
+- [rust]("https://github.com/ohkilab/SU-expA-final-references/rust")
