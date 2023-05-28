@@ -18,7 +18,7 @@ mod repository;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    env_logger::init_from_env(Env::default().default_filter_or("debug"));
+    //env_logger::init_from_env(Env::default().default_filter_or("debug"));
 
     let pool = Arc::new(MySqlPool::connect(&env::var("DATABASE_URL")?).await?);
 
