@@ -9,10 +9,6 @@ const port = 3000
 const tagPath = '../csv/tag.csv'
 const geotagPath = '../csv/geotag.csv'
 
-let linecount = 0
-
-const parsedTag = []
-
 app.get('/',(req, res) => {
   // GETパラメータからtagを取得
   const key = req.query.tag
@@ -29,7 +25,6 @@ app.get('/',(req, res) => {
   tagParser
     .on('data', tagRow => {
       // デバッグ用のログ、有効時には検索が遅くなる
-      // console.log('row: ', tagRow)
       
       if(tags.length < 100) {
         if(tagRow[1] === key) {
@@ -53,50 +48,28 @@ app.get('/',(req, res) => {
               }
             } else {
               geotagParser.destroy()
-              res.send(geotags)
+              res.send({
+                tag: key,
+                results: geotags.map(geotag => ({
+                    lat: geotag[2],
+                    lon: geotag[3],
+                    date: geotag[1],
+                    url: geotag[4]
+                  })
+                )
+              })
             }
-
           })
 
-
-        // res.send(tags)
-        // console.log(tags.map(tag => parsedGeotag.filter(geotag => geotag[0] === tag)))
-
+        req.on('close', () => {
+          geotagParser.destroy()
+        })
       }
-
-      // if(tagRow[1] === key) {
-      //   // tag.csvの処理は完了でストリームを破棄する
-      //   tagReadStream.destroy()
-      //
-      //   let geotags = []
-      //   
-      //   // tag.csvのタグが見つかったらgeotag.csvで検索
-      //   geotagReadStream
-      //     .pipe(parse({delimiter: ','}))
-      //     .on('data', geotagRow => {
-      //       // if(geotagRow[0] === tagRow[0]) {
-      //       //   geotagReadStream.destroy()
-      //       //   res.send(geotagRow)
-      //       // }
-      //
-      //       if(geotags.length < 10) {
-      //         // console.log(geotagRow)
-      //         if(geotagRow[0] === tagRow[0]) {
-      //           geotags.push(geotagRow)
-      //           console.log(`found ${geotags.length} tags`)
-      //         }
-      //       } else {
-      //         geotagReadStream.destroy()
-      //         res.send(geotags)
-      //       }
-      //     })
-      //   // res.send(row[0])
-      // }
     })
 
   // 接続切れたらストリームを破棄する(メモリーリーク防止)
   req.on('close', () => {
-    console.log('session closed, destroying streams')
+    // console.log('session closed, destroying streams')
     tagParser.destroy()
     geotagReadStream.destroy()
   })
