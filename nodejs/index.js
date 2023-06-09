@@ -1,7 +1,7 @@
 // 実行する前に../csv/フォルダーにtag.csvとgeotag.csvを用意してください
 //
 // 本コードは以下のコマンドの実装、ripgrepインストール必要がある
-// rg ,test$ ../csv/tag.csv -r '' | rg -f - ../csv/geotag.csv -m 100
+// rg ,test$ ../csv/tag.csv -r '' -m 100 | rg -f - ../csv/geotag.csv -m 100
 const { spawn } = require('node:child_process')
 const express = require('express')
 const app = express()
