@@ -7,5 +7,8 @@ ifndef CARGO
 	@source ~/.cargo/env
 endif
 
-run: install
-	@cargo run --release
+tag.json: install
+	@cargo run --release --bin prepare
+
+run: tag.json
+	@cargo run --release --bin server
