@@ -10,5 +10,5 @@ endif
 tag.json: install
 	@cargo run --release --bin prepare
 
-run: tag.json
+run:
 	@cargo run --release --bin server

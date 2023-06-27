@@ -29,9 +29,12 @@ struct GetParameter {
 async fn handle(
     params: Query<GetParameter>, // http://example.com?tag=hoge の hoge が入ってる
 ) -> Result<HttpResponse, actix_web::Error> {
+    dbg!(&params.tag);
+
     // 前処理データである tag.json を読み込む
     // [hint] サーバー起動時に読み込んでそれを再利用すれば良さそう
     // actix_web だと web::Data<T> を使ってデータを保持することができる
+    // それをしないと多分 tag.json の load だけでタイムアウトします
     // ref: https://actix.rs/docs/application/#state
     let tag_json = TagJSON::from_path("tag.json").map_err(ErrorInternalServerError)?;
 
