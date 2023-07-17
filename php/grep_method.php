@@ -53,9 +53,9 @@ function getGeotag($tag)
     # テキストをカンマ区切りで配列に変換する
     # 形式は"timestamp,lat,lon,url"
     $data = explode(",", $geotagResult[0], 5);
-    $timestamp = $data[1];
-    $lat = $data[2];
-    $lon = $data[3];
+    $timestamp = str_replace("\"", "", $data[1]);
+    $lat = floatval($data[2]);
+    $lon = floatval($data[3]);
     $url = $data[4];
 
     # 辞書構造の作成
