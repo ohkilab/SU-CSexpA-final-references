@@ -1,5 +1,6 @@
 <?php
 const TAG_PATH = "../csv/tag_sort.csv";
+# geotagは日付が降順になるように事前ソートが必要
 const GEOTAG_PATH = "../csv/geotag_sort.csv";
 
 function getGeotag($tag)
@@ -15,6 +16,9 @@ function getGeotag($tag)
     throw new Exception("geotag file not found");
   }
 
+  # スクリプトはパイプ前後で以下の二文に分けられる
+  # 1. tagから該当タグの画像IDを抽出
+  # 2. geotagの先頭行から読み取り、1の画像IDと合致する行を100行抽出
   $tagSearch = "awk -F',' -v tag=\"" . $tag . "\" '$2==tag{print $1}' " . TAG_PATH . ' | awk -F "," ' . "'FNR==NR{ids[$1];next} $1 in ids{count++; if(count==101){exit}; print}' - " . GEOTAG_PATH;
 
   # grepの実行 $tagResultに実行結果がテキストで格納されている
@@ -48,17 +52,30 @@ function print_json($json)
 }
 
 $tag = $_REQUEST["tag"];
-$cachedData = apcu_fetch($tag);
-if ($cachedData !== false) {
-  print_json($cachedData);
+if ($tag == "") {
+  # タグが空の時の処理
+  print_json("{error: \"tag not found\"}");
 } else {
-  $geotag_result = getGeotag($tag);
-  $responce_dict = array("tag" => $tag, "results" => $geotag_result);
-  $json = json_encode($responce_dict);
-  print_json($json);
 
-  $ttl = 300;
-  apcu_store($tag, $json, $ttl);
+  # レスポンスがキャッシュされていないか確認
+  $cachedData = apcu_fetch($tag);
+
+  if ($cachedData !== false) {
+    # キャッシュがある時はこのまま値を返す
+    print_json($cachedData);
+  } else {
+
+    $geotag_result = getGeotag($tag);
+    $responce_dict = array("tag" => $tag, "results" => $geotag_result);
+
+    $json = json_encode($responce_dict);
+    print_json($json);
+
+    # レスポンスをキャッシュする
+    # キャッシュの有効秒数はttlで設定する
+    $ttl = 300;
+    apcu_store($tag, $json, $ttl);
+  }
 }
 
 ?>
