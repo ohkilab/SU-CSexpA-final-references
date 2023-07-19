@@ -4,14 +4,13 @@ use rust::model::{Geotag, TagGeotag, TagJSON};
 
 fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("loading ../csv/tag.csv ...");
-    // HashMap<String, String>をHashMap<String, Vector<String>>へ変更
-    let mut tag_name_by_id: HashMap<String, Vec<String>> = HashMap::new();
+    let mut tag_names_by_id = HashMap::new();
     {
         let file = File::open("../csv/tag.csv")?;
         let mut tag_csv = ReaderBuilder::new().has_headers(false).from_reader(file);
         for record in tag_csv.records() {
             let record = record?;
-            tag_name_by_id
+            tag_names_by_id
                 .entry(record.get(0).unwrap().to_string())
                 .or_insert_with(Vec::new)
                 .push(record.get(1).unwrap().to_string());
@@ -26,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let mut geotag_csv = ReaderBuilder::new().has_headers(false).from_reader(file);
         for record in geotag_csv.records() {
             let record = record?;
-            let tag_names = match tag_name_by_id.get(record.get(0).unwrap()) {
+            let tag_names = match tag_names_by_id.get(record.get(0).unwrap()) {
                 Some(x) => x,
                 None => continue,
             };
