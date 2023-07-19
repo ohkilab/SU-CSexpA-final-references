@@ -1,19 +1,20 @@
 use std::{collections::HashMap, error::Error, fs::File, io::BufWriter};
-
-use csv::Reader as CSVReader;
+use csv::ReaderBuilder;
 use rust::model::{Geotag, TagGeotag, TagJSON};
 
 fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("loading ../csv/tag.csv ...");
-    let mut tag_name_by_id = HashMap::new();
+    // HashMap<String, String>をHashMap<String, Vector<String>>へ変更
+    let mut tag_name_by_id: HashMap<String, Vec<String>> = HashMap::new();
     {
-        let mut tag_csv = CSVReader::from_path("../csv/tag.csv")?;
+        let file = File::open("../csv/tag.csv")?;
+        let mut tag_csv = ReaderBuilder::new().has_headers(false).from_reader(file);
         for record in tag_csv.records() {
             let record = record?;
-            tag_name_by_id.insert(
-                record.get(0).unwrap().to_string(),
-                record.get(1).unwrap().to_string(),
-            );
+            tag_name_by_id
+                .entry(record.get(0).unwrap().to_string())
+                .or_insert_with(Vec::new)
+                .push(record.get(1).unwrap().to_string());
         }
     }
     eprintln!("../csv/tag.csv has been loaded");
@@ -21,21 +22,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     eprintln!("loading ../csv/geotag.csv ...");
     let mut geotags_by_tag_name = HashMap::new();
     {
-        let mut geotag_csv = CSVReader::from_path("../csv/geotag.csv")?;
+        let file = File::open("../csv/geotag.csv")?;
+        let mut geotag_csv = ReaderBuilder::new().has_headers(false).from_reader(file);
         for record in geotag_csv.records() {
             let record = record?;
-            let tag_name = match tag_name_by_id.get(record.get(0).unwrap()) {
+            let tag_names = match tag_name_by_id.get(record.get(0).unwrap()) {
                 Some(x) => x,
                 None => continue,
             };
 
-            let entry = geotags_by_tag_name.entry(tag_name).or_insert(Vec::new());
-            entry.push(Geotag {
-                date: record.get(1).unwrap().trim_matches('"').to_string(),
-                latitude: record.get(2).unwrap().parse().unwrap(),
-                longitude: record.get(3).unwrap().parse().unwrap(),
-                url: record.get(4).unwrap().to_string(),
-            });
+            for tag_name in tag_names {
+                let entry = geotags_by_tag_name.entry(tag_name).or_insert(Vec::new());
+                entry.push(Geotag {
+                    date: record.get(1).unwrap().trim_matches('"').to_string(),
+                    latitude: record.get(2).unwrap().parse().unwrap(),
+                    longitude: record.get(3).unwrap().parse().unwrap(),
+                    url: record.get(4).unwrap().to_string(),
+                });
+            }
         }
     }
     eprintln!("../csv/geotag.csv has been loaded");
