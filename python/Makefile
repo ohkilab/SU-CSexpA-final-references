@@ -26,4 +26,4 @@ fmt-check:
 # サーバーの起動 (Ctrl-C で終了)
 .PHONY:	run/server
 run/server:
-	poetry run python3 -m app.main
+	poetry run python3 -m app.cmd.serve
