@@ -4,15 +4,15 @@ version = "0.1.0"
 description = ""
 authors = []
 readme = "README.md"
-packages = [{include = "app/"}]
+packages = [{ include = "app/" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-fastapi = "^0.100.0"
+python = "^3.12"
+fastapi = "^0.109.0"
 click = "^8.1.6"
 aiofiles = "^23.1.0"
 aiocsv = "^1.2.4"
-uvicorn = {extras = ["standard"], version = "^0.23.1"}
+uvicorn = { extras = ["standard"], version = "^0.27.1" }
 python-dotenv = "^1.0.0"
 
 
@@ -30,7 +30,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.black]
 line-length = 120
 target-version = ['py310']
-skip-string-normalization = false  # ''を""へ直すのをスキップするか
+skip-string-normalization = false # ''を""へ直すのをスキップするか
 include = '\.py$'
 exclude = '''
 (
