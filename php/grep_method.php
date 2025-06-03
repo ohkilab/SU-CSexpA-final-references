@@ -81,7 +81,7 @@ $tag = $_REQUEST["tag"];
 $geotag_result = getGeotag($tag);
 $responce_dict = array("tag" => $tag, "results" => $geotag_result);
 $json = json_encode($responce_dict);
-print_json($json)
+print_json($json);
 
   ?>
 
