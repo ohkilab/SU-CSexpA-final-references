@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
@@ -43,16 +44,52 @@ func main() {
 			return
 		}
 
-		name := r.URL.Query().Get("tag")
-		geotags, err := repository.GetGeotagsByTag(r.Context(), db, name)
+		query := r.URL.Query()
+		tags := make([]string, 0, len(query["tag"]))
+		for _, tag := range query["tag"] {
+			if tag != "" {
+				tags = append(tags, tag)
+			}
+		}
+		if len(tags) == 0 {
+			http.Error(w, "tag is required", http.StatusBadRequest)
+			return
+		}
+
+		tagOperator := query.Get("tagOperator")
+		switch tagOperator {
+		case "":
+			if len(tags) > 1 {
+				http.Error(w, "tagOperator is required for multiple tags", http.StatusBadRequest)
+				return
+			}
+			tagOperator = "or"
+		case "and", "or":
+		default:
+			http.Error(w, "tagOperator must be 'and' or 'or'", http.StatusBadRequest)
+			return
+		}
+
+		sortOrder := query.Get("sortOrder")
+		switch sortOrder {
+		case "":
+			sortOrder = "desc"
+		case "asc", "desc":
+		default:
+			http.Error(w, "sortOrder must be asc or desc", http.StatusBadRequest)
+			return
+		}
+
+		geotags, err := repository.GetGeotags(r.Context(), db, tags, tagOperator, strings.ToUpper(sortOrder))
 		if err != nil {
 			log.Println(err)
 			http.Error(w, "failed to get geotags", http.StatusInternalServerError)
 			return
 		}
 
+		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(&Response{
-			Tag: name,
+			Tag: strings.Join(tags, ","),
 			Results: lo.Map(geotags, func(geotag *repository.GeoTag, _ int) *TagResult {
 				return &TagResult{
 					Lat:  geotag.Latitude,

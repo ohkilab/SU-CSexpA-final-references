@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 import aiocsv
 import aiofiles
@@ -37,9 +37,14 @@ async def hello2(payload: HelloRequest) -> dict:
     return {"msg": msg * payload.repeat}
 
 
+PhotoKey = tuple[str, float, float, str]
+
+
 @router.get("/")
 async def find_geotags_by_tag(
-    q_tag: Annotated[str, Query(alias="tag")],
+    q_tag: Annotated[list[str], Query(alias="tag")],
+    q_tag_operator: Annotated[Literal["and", "or"], Query(alias="tagOperator")] = "or",
+    q_sort_order: Annotated[Literal["asc", "desc"], Query(alias="sortOrder")] = "desc",
 ) -> GeotagListResponse:
     """
     本命の API の実装。
@@ -48,24 +53,41 @@ async def find_geotags_by_tag(
     改善できるところは多いにあるのでがんばりましょう💪
     """
     Item = GeotagListResponse.Item
-    results: list[Item] = []
+    query_tags = list(dict.fromkeys(q_tag))
+    query_tag_set = set(query_tags)
+    candidates: dict[PhotoKey, tuple[Item, set[str]]] = {}
 
     # 非同期 IO でファイルをオープン
     async with aiofiles.open(cfg.prepared_csv_path, mode="rt", encoding="utf-8") as f:
-        # CSV の行を1行ずつ読み込んで tag が q_tag と一致する行だけ集める
+        # CSV の行を1行ずつ読み込んで、検索対象タグに一致する写真だけ集める
         async for row in aiocsv.readers.AsyncReader(f):
             tag, date, lat, lon, url = row
-            if tag == q_tag:
+            if tag not in query_tag_set:
+                continue
+
+            lat_float = float(lat)
+            lon_float = float(lon)
+            photo_key = (date, lat_float, lon_float, url)
+
+            if photo_key not in candidates:
                 item = Item(
                     date=date,
-                    lat=float(lat),
-                    lon=float(lon),
+                    lat=lat_float,
+                    lon=lon_float,
                     url=url,
                 )
-                results.append(item)
+                candidates[photo_key] = (item, set())
 
-    # 日付の降順でソート
-    results.sort(key=lambda x: x.date, reverse=True)
+            candidates[photo_key][1].add(tag)
+
+    if q_tag_operator == "and":
+        results = [item for item, tags in candidates.values() if query_tag_set <= tags]
+    else:
+        results = [item for item, _ in candidates.values()]
+
+    # date が同一の場合は sortOrder に関係なく URL の昇順で返す
+    results.sort(key=lambda x: x.url)
+    results.sort(key=lambda x: x.date, reverse=q_sort_order == "desc")
 
     # ソート結果の先頭 100 行までをレスポンス
-    return GeotagListResponse(tag=q_tag, results=results[:100])
+    return GeotagListResponse(tag=",".join(query_tags), results=results[:100])
