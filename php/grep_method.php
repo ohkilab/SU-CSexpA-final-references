@@ -2,7 +2,67 @@
 const TAG_PATH = "../csv/tag.csv";
 const GEOTAG_PATH = "../csv/geotag.csv";
 
-function getGeotag($tag)
+function getImageIdsByTag($tag)
+{
+  $tagResult = array();
+
+  # tagが含まれる行(形式は"画像ID,tag")を抽出するためのgrepコマンド
+  $tagSearch = 'grep ",' . $tag . '$" ' . TAG_PATH;
+  # grepの実行 $tagResultに実行結果がテキストで格納されている
+  exec($tagSearch, $tagResult, $retVal);
+
+  # grepの実行結果が正常でない場合にエラーを出す
+  if ($retVal > 1) {
+    throw new Exception($tag . "と紐づく画像ID抽出中に例外が発生しました");
+  }
+  if ($retVal === 1) {
+    return array();
+  }
+
+  $image_id_list = array();
+
+  foreach ($tagResult as $tagLine) {
+    $data = str_getcsv($tagLine);
+
+    if (count($data) < 2 || $data[1] !== $tag) {
+      continue;
+    }
+
+    $image_id_list[$data[0]] = true;
+  }
+
+  return $image_id_list;
+}
+
+function getRequestTags()
+{
+  $tags = array();
+
+  if (isset($_SERVER["QUERY_STRING"])) {
+    $queryParams = explode("&", $_SERVER["QUERY_STRING"]);
+
+    foreach ($queryParams as $queryParam) {
+      $pair = explode("=", $queryParam, 2);
+      $key = urldecode($pair[0]);
+
+      if ($key === "tag" && isset($pair[1])) {
+        array_push($tags, urldecode($pair[1]));
+      }
+    }
+  }
+
+  if (empty($tags) && isset($_REQUEST["tag"])) {
+    if (is_array($_REQUEST["tag"])) {
+      $tags = $_REQUEST["tag"];
+    } else {
+      $tags = array($_REQUEST["tag"]);
+    }
+  }
+
+  return array_values(array_unique($tags));
+}
+
+function getGeotag($tags, $tagOperator, $sortOrder)
 {
 
   $geotag_info_list = array();
@@ -15,45 +75,48 @@ function getGeotag($tag)
     throw new Exception("geotag file not found");
   }
 
-  # tagが含まれる行(形式は"画像ID,tag")を100件抽出するためのgrepコマンド
-  $tagSearch = "grep -m 100 " . '",' . $tag . '$" ' . TAG_PATH;
-  # grepの実行 $tagResultに実行結果がテキストで格納されている
-  $is_success = exec($tagSearch, $tagResult, $retVal);
-
-  # grepの実行結果が正常でない場合にエラーを出す
-  if (!$is_success) {
-    throw new Exception($tag . "と紐づく画像ID抽出中に例外が発生しました");
+  if (empty($tags)) {
+    return $geotag_info_list;
   }
 
-  # 整形のための無名関数
-  $tagSplitPerComma = function ($tagLine) {
-    $data = explode(",", $tagLine);
-    $image_id = $data[0];
-    $tag = $data[1];
-    return $image_id;
-  };
-  # "image_id,tag"から"tag"に整形する
-  $image_id_list = array_map($tagSplitPerComma, $tagResult);
+  $image_id_list = array();
+  $is_first_tag = true;
 
-  # TODO:画像IDが0件であった場合の例外処理
+  foreach ($tags as $tag) {
+    $tag_image_id_list = getImageIdsByTag($tag);
+
+    if ($tagOperator === "and") {
+      if ($is_first_tag) {
+        $image_id_list = $tag_image_id_list;
+      } else {
+        $image_id_list = array_intersect_key($image_id_list, $tag_image_id_list);
+      }
+    } else {
+      $image_id_list = $image_id_list + $tag_image_id_list;
+    }
+
+    $is_first_tag = false;
+  }
 
   # 抽出してきた画像IDの情報をgeotag.csvから抽出する
-  foreach ($image_id_list as $image_id) {
+  foreach (array_keys($image_id_list) as $image_id) {
+    $geotagResult = array();
+
     # 画像IDを含む行を一件抽出してくるgrepコマンド
     $geotagSearch = "grep -m 1 " . $image_id . " " . GEOTAG_PATH;
     # grepコマンドの実行 $geotagResultに結果が格納されている
-    $is_succcess = exec($geotagSearch, $geotagResult, $retVal);
+    exec($geotagSearch, $geotagResult, $retVal);
 
     # grepの実行結果が正常でない場合にエラーを出す
-    if (!$is_success) {
+    if ($retVal !== 0) {
       throw new Exception("画像ID:" . $image_id . "の情報を取得中に例外が発生しました");
     }
 
     # 空白文字の削除
     # テキストをカンマ区切りで配列に変換する
-    # 形式は"timestamp,lat,lon,url"
-    $data = explode(",", $geotagResult[0], 5);
-    $timestamp = str_replace("\"", "", $data[1]);
+    # 形式は"image_id,timestamp,lat,lon,url"
+    $data = str_getcsv($geotagResult[0]);
+    $timestamp = $data[1];
     $lat = floatval($data[2]);
     $lon = floatval($data[3]);
     $url = $data[4];
@@ -63,12 +126,21 @@ function getGeotag($tag)
     # 戻り値となる変数に結果を結合する
     array_push($geotag_info_list, $geotag_info);
 
-    # execは出力先の配列がからでない時既存の配列に結合するので空にしておく必要がある
-    unset($geotagResult);
-
   }
 
-  return $geotag_info_list;
+  usort($geotag_info_list, function ($left, $right) use ($sortOrder) {
+    if ($left["date"] === $right["date"]) {
+      return strcmp($left["url"], $right["url"]);
+    }
+
+    if ($sortOrder === "asc") {
+      return strcmp($left["date"], $right["date"]);
+    }
+
+    return strcmp($right["date"], $left["date"]);
+  });
+
+  return array_slice($geotag_info_list, 0, 100);
 }
 
 function print_json($json)
@@ -77,11 +149,12 @@ function print_json($json)
   echo $json;
 }
 
-$tag = $_REQUEST["tag"];
-$geotag_result = getGeotag($tag);
-$responce_dict = array("tag" => $tag, "results" => $geotag_result);
-$json = json_encode($responce_dict);
+$tags = getRequestTags();
+$tagOperator = isset($_REQUEST["tagOperator"]) && $_REQUEST["tagOperator"] === "and" ? "and" : "or";
+$sortOrder = isset($_REQUEST["sortOrder"]) && $_REQUEST["sortOrder"] === "asc" ? "asc" : "desc";
+$geotag_result = getGeotag($tags, $tagOperator, $sortOrder);
+$response_dict = array("tag" => implode(",", $tags), "results" => $geotag_result);
+$json = json_encode($response_dict);
 print_json($json);
 
-  ?>
-
+?>
