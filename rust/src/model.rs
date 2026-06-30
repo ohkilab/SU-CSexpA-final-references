@@ -1,3 +1,4 @@
+// rustのプログラムはオンメモリで動作しますが、csvファイルをそのまま流し込むだけでは2GBに収まらないためうまく前処理を行う必要があります
 use serde::{Deserialize, Serialize};
 use std::{error::Error, fs::File, io::BufReader, path::Path};
 
@@ -16,29 +17,27 @@ impl TagJSON {
     }
 }
 
-// tag.json の struct
-/*
-[hint] 現状は愚直に各フィールドを読み込んでいるので RAM が 1GB だと多分メモリに乗せるのは無理です
-乗せる方法としては以下の方法が挙げられます。
-1. url の表現方法を変えてみる
-    URL の形式は http://farm9.static.flickr.com/8050/8376611070_aeb13ec0fe.jp
-    http://farm と .static.flickr.com/ と .jp は共通部分だから取り除くことができそう
-    8050 は文字列だと 4byte だが整数にすれば 2byte(16bit) で表現できそう
-    こんな感じのことをうまい具合にやると 60byte から 10byte ぐらいまで節約できると思います
-2. date の表現方法を変えてみる
-    ある時間を基準とした経過時間として表現すれば 32bit まで削減できそう
-3. など
-*/
 #[derive(Serialize, Deserialize)]
 pub struct TagGeotag {
     pub tag_name: String,
     pub geotags: Vec<Geotag>,
 }
 
-#[derive(Serialize, Deserialize)]
+// サーバー内で使い回すため Clone を追加
+// 画像の出力形式に合わせてキー名を lat, lon に変更
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Geotag {
-    pub date: String,
+    #[serde(rename = "lat")]
     pub latitude: f64,
+    #[serde(rename = "lon")]
     pub longitude: f64,
+    pub date: String,
     pub url: String,
+}
+
+// 新規追加: 指定された出力形式のJSONラッパー
+#[derive(Serialize, Deserialize)]
+pub struct SearchResponse {
+    pub tag: String,
+    pub results: Vec<Geotag>,
 }
