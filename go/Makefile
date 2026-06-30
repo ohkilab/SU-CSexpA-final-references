@@ -1,4 +1,6 @@
 GO := $(shell command -v go 2> /dev/null)
+export GOWORK := off
+export CGO_ENABLED := 0
 
 .PHONY: install
 install:
